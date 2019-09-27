@@ -12,7 +12,7 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.disable_ipv6=1
     environment:
-      - DRIVER=afxdp
+      - DRIVER=dpdk
       - DEBUG=false
       - ROUTER=172.16.239.12
       - ROUTER_MAC=02:42:ac:10:ef:0c
@@ -20,6 +20,7 @@ services:
       - CLIENT_MAC=02:42:ac:10:ef:0b
       - SERVER=172.16.239.14
       - SERVER_MAC=02:42:ac:10:ef:0a
+      - DPDK_DRIVER=igb_uio
 
   client:
     build: src/pod
