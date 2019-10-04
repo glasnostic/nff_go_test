@@ -11,6 +11,7 @@ import (
 	"github.com/intel-go/nff-go/devices"
 	"github.com/intel-go/nff-go/flow"
 	"github.com/intel-go/nff-go/low"
+	libpacket "github.com/intel-go/nff-go/packet"
 )
 
 // nff-go changes the port type from uint8 to uint16
@@ -25,7 +26,7 @@ type nffRunnerLinux struct {
 	port           portType
 	device         devices.Device
 	current        *nffPacketLinux
-	incomming      chan nffPacketLinux
+	incomming      chan Packet
 	originalDriver string
 	network        string
 	hwaddr         net.HardwareAddr
@@ -34,10 +35,10 @@ type nffRunnerLinux struct {
 func newRunner(nicName string) (*nffRunnerLinux, error) {
 	runner := &nffRunnerLinux{
 		ifName:    nicName,
-		incomming: make(chan nffPacketLinux),
+		incomming: make(chan Packet),
 	}
 
-	if err := runner.register(nic); err != nil {
+	if err := runner.register(); err != nil {
 		return nil, err
 	}
 
@@ -94,7 +95,7 @@ func (n *nffRunnerLinux) register() error {
 	if err != nil {
 		return err
 	}
-	n.network, err = getNetwork(n.ifName)
+	n.hwaddr, n.network, err = getNetworkInfo(n.ifName)
 	if err != nil {
 		return err
 	}
@@ -128,8 +129,8 @@ func (n *nffRunnerLinux) unregister() error {
 	// 3. Restore IP configuration
 	// ip address replace [ip]/[mask-digits] dev [nic]
 	log.Println("Try to restore NIC configuration")
-	cmd := exec.Command("ip", "address", "replace", n.network, "dev", n.ifName)
-	if err := cmd.Output(); err != nil {
+	cmd = exec.Command("ip", "address", "replace", n.network, "dev", n.ifName)
+	if _, err := cmd.Output(); err != nil {
 		return fmt.Errorf("failed to configure network interface: %s", err.Error())
 	}
 
@@ -158,7 +159,7 @@ func (n *nffRunnerLinux) init() error {
 
 	log.Println("Setting drop handler on port", n.port)
 	// Packet handler: rewrite and filter packet
-	if err := flow.SetHandlerDrop(mainFlow, n.handler, nil); err != nil {
+	if err := flow.SetHandlerDrop(mainFlow, n.handle, nil); err != nil {
 		return err
 	}
 	log.Println("Set drop handler on port", n.port)
@@ -187,7 +188,7 @@ func (n *nffRunnerLinux) handle(pkt *libpacket.Packet, _ flow.UserContext) bool 
 	}
 	nffpacket := newNFFPacket(pkt)
 	n.current = nffpacket
-	n.incomming <- nffpacket
+	n.incomming <- nffpacket.RawBuffer()
 	return <-nffpacket.verdict
 }
 
@@ -214,14 +215,14 @@ func (n *nffRunnerLinux) dropOldAndSendNewPacket(data Packet) {
 	}
 }
 
-func (n *nffRunnerLinux) packetNotChanged(data packet.Packet) bool {
+func (n *nffRunnerLinux) packetNotChanged(data Packet) bool {
 	// XXX Dirty check
 	var buf1, buf2 []byte = []byte(n.current.raw), []byte(data)
 	return len(buf1) > 0 && len(buf2) > 0 && unsafe.Pointer(&buf1[0]) == unsafe.Pointer(&buf2[0])
 }
 
-func getNetworkInfo(nicName string) (net.HWAddress, string, error) {
-	iface, err := net.Interface(nicName)
+func getNetworkInfo(nicName string) (net.HardwareAddr, string, error) {
+	iface, err := net.InterfaceByName(nicName)
 	if err != nil {
 		return net.HardwareAddr(nil), "", err
 	}
@@ -246,4 +247,13 @@ func getEthPort(hwaddr net.HardwareAddr) portType {
 		}
 	}
 	return defaultPort
+}
+
+func hardwareAddressEqual(addr1, addr2 net.HardwareAddr) bool {
+	for i, j := 0, 0; i < len(addr1) && j < len(addr2); i, j = i+1, j+1 {
+		if addr1[i] != addr2[j] {
+			return false
+		}
+	}
+	return true
 }

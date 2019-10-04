@@ -7,8 +7,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"crimea/gateway/router/packet"
-
 	libpacket "github.com/intel-go/nff-go/packet"
 )
 
@@ -18,7 +16,7 @@ const (
 )
 
 type nffPacketLinux struct {
-	raw     packet.Packet
+	raw     Packet
 	pkt     *libpacket.Packet
 	verdict chan bool
 	once    sync.Once
@@ -46,6 +44,6 @@ func (n *nffPacketLinux) SetVerdict(value bool) {
 	})
 }
 
-func (n *nffPacketLinux) RawBuffer() packet.Packet {
+func (n *nffPacketLinux) RawBuffer() Packet {
 	return n.raw
 }
