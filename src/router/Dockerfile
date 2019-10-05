@@ -46,7 +46,9 @@ RUN	git submodule update
 # Disable mlx driver for the time being
 # "make all" will do "make nff-go-base dpdk test examples", and we don't need the test and examples
 ARG NFF_GO_NO_MLX_DRIVERS=1
-RUN go mod download
+# Disable mlx driver for the time being
+RUN sed -i 26d dpdk/Makefile
+# "make all" will do "make nff-go-base dpdk test examples", and we don't need the test and examples
 RUN make RTE_KERNELDIR=/usr/src/linux-5.1 -C nff-go-base
 RUN make RTE_KERNELDIR=/usr/src/linux-5.1 -C dpdk
 
@@ -55,7 +57,7 @@ RUN mkdir -p /go/router
 WORKDIR /go/router
 # copy codes
 COPY . .
-RUN go mod download
+ENV CGO_CFLAGS_ALLOW='(-mno-fsgsbase|-mno-f16c|-include|rte_config.h)'
 RUN make build
 
 # --------------------- FINAL LAYER -----------------------

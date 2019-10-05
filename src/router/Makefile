@@ -31,4 +31,5 @@ prepare-cgo-flags: cleanup-cgo-flags
 .PHONY: build
 build: prepare-cgo-flags
 	go generate -v $(BUILD_TAGS) ./...
+	go mod edit -replace=github.com/intel-go/nff-go@v0.8.0=$(NFFGO_ROOT)
 	go build -o router $(BUILD_TAGS)

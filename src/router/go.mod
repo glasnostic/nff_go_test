@@ -7,5 +7,3 @@ require (
 	github.com/intel-go/nff-go v0.8.0
 	golang.org/x/sys v0.0.0-20190405154228-4b34438f7a67
 )
-
-// replace github.com/intel-go/nff-go v0.8.0 => ../nff-go
