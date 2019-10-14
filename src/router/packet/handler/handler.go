@@ -26,8 +26,12 @@ func NewRewriter(localMac, clientMac, serverMac net.HardwareAddr, localIP net.IP
 		server: newPod(server, serverMac),
 		table:  make(map[uint32]net.HardwareAddr),
 	}
-	res.table[res.client.value] = res.client.mac
-	res.table[res.server.value] = res.server.mac
+	if res.client.mac != nil {
+		res.table[res.client.value] = res.client.mac
+	}
+	if res.server.mac != nil {
+		res.table[res.server.value] = res.server.mac
+	}
 	return res
 }
 

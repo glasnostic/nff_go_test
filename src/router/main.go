@@ -25,7 +25,8 @@ var (
 )
 
 const (
-	defaultDriver = "afxdp"
+	defaultDriver = "dpdk"
+	defaultNIC    = "eth0"
 )
 
 func main() {
@@ -48,10 +49,6 @@ func main() {
 }
 
 func setup() {
-	routerIPString := os.Getenv("ROUTER")
-	local = net.ParseIP(routerIPString)
-	mustHaveIP(local, "local ip")
-
 	clientIPString := os.Getenv("CLIENT")
 	client = net.ParseIP(clientIPString)
 	mustHaveIP(client, "client ip")
@@ -65,10 +62,13 @@ func setup() {
 		driverName = defaultDriver
 	}
 
-	nicName = "eth0"
+	nicName := os.Getenv("NIC")
+	if nicName == "" {
+		nicName = defaultNIC
+	}
+
 	mustSuccess(loadMAC(), "Failed to load MAC")
 	mustSuccess(setRlimit(), "Failed to setrlimit")
-
 }
 
 func loadMAC() error {
@@ -78,15 +78,48 @@ func loadMAC() error {
 		return fmt.Errorf("given NIC %s must existing and accessible", nicName)
 	}
 	localMac = nic.HardwareAddr
-	clientMac, err = net.ParseMAC(os.Getenv("CLIENT_MAC"))
+	local, err = getFirstIP(nic)
 	if err != nil {
 		return err
 	}
-	serverMac, err = net.ParseMAC(os.Getenv("SERVER_MAC"))
+	log.Printf("Using IP %v bound to nic %s", local, nic.Name)
+	clientMac, err = parseMACAllowEmpty(os.Getenv("CLIENT_MAC"))
+	if err != nil {
+		return err
+	}
+	serverMac, err = parseMACAllowEmpty(os.Getenv("SERVER_MAC"))
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func parseMACAllowEmpty(mac string) (net.HardwareAddr, error) {
+	if mac == "" {
+		return nil, nil
+	} else {
+		parsedMac, err := net.ParseMAC(mac)
+		if err != nil {
+			return nil, err
+		}
+		return parsedMac, nil
+	}
+}
+
+func getFirstIP(nic *net.Interface) (net.IP, error) {
+	addrs, err := nic.Addrs()
+	if err != nil {
+		return nil, err
+	}
+	for _, addr := range addrs {
+		switch v := addr.(type) {
+		case *net.IPNet:
+			return v.IP, nil
+		case *net.IPAddr:
+			return v.IP, nil
+		}
+	}
+	return nil, fmt.Errorf("no IP bound to nic %s", nic.Name)
 }
 
 func setRlimit() error {
