@@ -33,18 +33,32 @@ RUN cd /tmp/ && git clone -b ${libbpf_version} --single-branch --depth=1 https:/
 # -------------------- BUILDER -----------------------
 FROM base-layer AS builder
 
+WORKDIR /go
+ARG nff_version=fix-pci-v0.8.0
+RUN git clone -b $nff_version --single-branch --depth=1 https://github.com/glasnostic/nff-go/
+WORKDIR /go/nff-go
+RUN export PATH="$PATH:$GOPATH"/bin
+# needed by new dpdk building for lua5.3.pc
+RUN apt-get install -y liblua5.3-dev libmnl-dev libibverbs-dev libnuma-dev
+# nff-go is using git submodule to fetch dpdk and pktgen-dpdk code
+RUN git submodule init
+RUN	git submodule update
+# Disable mlx driver for the time being
+# "make all" will do "make nff-go-base dpdk test examples", and we don't need the test and examples
+ARG NFF_GO_NO_MLX_DRIVERS=1
+# Disable mlx driver for the time being
+RUN sed -i 26d dpdk/Makefile
+# "make all" will do "make nff-go-base dpdk test examples", and we don't need the test and examples
+RUN make RTE_KERNELDIR=/usr/src/linux-5.1 -C nff-go-base
+RUN make RTE_KERNELDIR=/usr/src/linux-5.1 -C dpdk
+
 # build folder
 RUN mkdir -p /go/router
 WORKDIR /go/router
-
-# cache go module file
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
 # copy codes
 COPY . .
-RUN go generate ./...
-RUN go build -o router
+ENV CGO_CFLAGS_ALLOW='(-mno-fsgsbase|-mno-f16c|-include|rte_config.h)'
+RUN make build
 
 # --------------------- FINAL LAYER -----------------------
 FROM golang:1.12 AS final-layer

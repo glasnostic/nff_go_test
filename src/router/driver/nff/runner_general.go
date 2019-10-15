@@ -1,6 +1,6 @@
 // +build !linux
 
-package libbpf
+package nff
 
 import "errors"
 
@@ -8,6 +8,6 @@ var (
 	ErrNetworkDriverNotAvailable = errors.New("Not available")
 )
 
-func newRunner(ifName string) (libbpfAfxdpRunner, error) {
+func newRunner(ifName string) (nffRunner, error) {
 	return nil, ErrNetworkDriverNotAvailable
 }

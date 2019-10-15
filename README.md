@@ -1,54 +1,82 @@
-# AF_XDP Test Environment Inside Docker
+# NFF-Go Test Environment Using Two VMs
 
-This example is meant as a test environment to check the feasibility and performance of AF_XDP inside a docker network (Containers
-communicating via the [veth driver](https://github.com/torvalds/linux/blob/master/drivers/net/veth.c)).
+This example is meant as a test to check the stability and 
+performance of [nff-go](https://github.com/intel-go/nff-go) running in different 
+VM environments.
 
 ## Test Setup
 
-We have a _Client_ and a _Server_ running a simple HTTP server and [iperf3](https://iperf.fr/). Both containers are reachable in the
-Docker network (CIDR: `172.16.239.0/24`) via IP `172.16.239.13` (_Client_) and `172.16.239.14` (_Server_).
+We have one VM (called _Pod_) 
+running two server processes: a simple HTTP server and [iperf3](https://iperf.fr/). 
+From the same VM we also start client processes that connect to the server processes. 
 
-To intercept the traffic via AF_XDP, we put a _Router_ container (IP `172.16.239.13`) in between. The router is
-rewriting the source and destination IP of each incoming packet. 
+Usually this traffic would go via the loopback device, but instead we want the traffic to go via
+an interface owned by nff-go.
 
-If coming from the _Client_, the destination IP is rewritten the _Server_'s IP and the other way around. 
-The source IP is set to the _Router_'s IP, to ensure that packets are sent back to the _Router_.
+For this we start another VM (called _Router_). It's purpose is to swap source 
+and destination IP of each incoming packet.
 
-If the _Client_ is now connecting to the _Router_, the traffic goes to the _Server_ via the _Router_. 
+If the _Pod_ is then connecting to the _Router_, the traffic goes back to itself. 
 The forward flow (`FF`) and backward flow (`BF`) looks like this:
  
 ```
-+-------------------+          +-------------------+          +-------------------+
-|                   |          |                   |          |                   |
-|                   |    FF    |                   |    FF    |                   |
-|      Client       +--------->+       Router      +--------->+       Server      |
-|  (172.16.239.13)  |    BF    |  (172.16.239.12)  |    BF    |  (172.16.239.14)  |
-|                   |<---------|                   |<---------|                   |
-|                   |          |                   |          |                   |
-+-------------------+          +-------------------+          +-------------------+
++-------------------+          +-------------------+
+|                   |    FF    |                   |
+|                   +--------->+                   |
+|       Pod         |          |       Router      |
+|                   |    BF    |                   |
+|                   |<---------|                   |
++-------------------+          +-------------------+
 ```
 
-> Additionally, the router also sends ARP requests to get the MAC address of the _Server_.
+## Run the example
 
-The test spends some time rewriting the packets. This could be avoided by placing _Client_ and _Server_
-in different networks and attaching two interfaces (one for each network) to the router.
-However, for simplicity we just wanted one network interface to be handled by AF_XDP. 
+### Preparations 
 
-## Run the Example
+First you'll have to checkout this code in both test VMs which must both have Docker installed.
 
-To run the example, you'll need to install Docker (tested with version 19.03) 
-on a Linux 5.1 (or greater) kernel based system and start:
+### Router VM 
 
-    $ ./start                   # run this example
-    $ ./stop                    # stop running the example
+On the _Router_ VM you have to first build the `router` docker container and initialize hugepages:
 
-Or if you want to run this example step by step, you can call the following commands:
+```bash
+$ ./scripts/huge  
+$ docker build -t router -f ./src/router/Dockerfile ./src/router
+```
 
-    $ ./scripts/huge                   # mount huge pages (required by the example)
-    $ docker-compose build             # build example Docker images
-    $ docker-compose up -d             # run the example
-    $ docker-compose logs -f <role>    # check log messages of container <role>
-                                       # here role could be router, client or service
-    $ docker-compose down              # stop running the example
-    
-After running this test case, you should get the results shown in the [./result](./result) directory.
+Then you can start the router process via:
+
+```bash
+$ docker run -d --privileged --network=host -e "CLIENT=$POD_IP" -e "SERVER=$POD_IP" -e "DPDK_DRIVER=igb_uio" -e "NIC=eth1" router
+```
+
+`POD_IP` is the IP of the `Pod VM` and the env variable `DPDK_DRIVER` is configuring the kernel module
+used by nff-go (in the example it's `igb_uio`). The used network interface is configured by changing the env variable `NIC`, here it's `eth1`. 
+
+> **Hint**: The `docker run` call returns the container id. You can check the logs with `docker logs <container_id>`. 
+
+> **Note**: The router also works with two _Pod_ VMs. One is then the _Client_ and the other the _Server_ VM.
+> To simplify the setup we only use one _Pod_ VM. This means the router parameters `CLIENT` and `SERVER` are all
+> set to the same IP, the one of the _Pod_ VM. 
+
+### Pod VM
+
+On the _Pod_ VM, you have to build the `pod` docker container first:
+
+```bash
+$ docker build -t pod -f ./src/pod/Dockerfile ./src/pod
+```
+
+After that, you can first run the server processes on the _Pod_ VM:
+
+```bash
+$ docker run -d -P --privileged --network=host pod service.sh
+```
+
+Then you can run the tests via:
+```bash
+$ docker run -it --privileged --network=host pod client.sh $ROUTER_IP
+```
+
+Where `ROUTER_IP` is the IP of the _Router_ VM.  
+
