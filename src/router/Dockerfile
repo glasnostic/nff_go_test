@@ -54,7 +54,7 @@ FROM golang:1.12 AS final-layer
 LABEL maintainer="guesslin@glasnostic.com"
 
 RUN apt-get update && \
-    apt-get install -y libpcap0.8 ethtool iptables libibverbs-dev libnuma-dev && \
+    apt-get install -y libpcap0.8 ethtool iptables libibverbs-dev libnuma-dev pciutils && \
     apt-get autoclean && \
     rm -rf /var/lib/apt/lists/*
 
