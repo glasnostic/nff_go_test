@@ -47,11 +47,14 @@ $ docker build -t router -f ./src/router/Dockerfile ./src/router
 Then you can start the router process via:
 
 ```bash
-$ docker run -d --privileged --network=host -e "CLIENT=$POD_IP" -e "SERVER=$POD_IP" -e "DPDK_DRIVER=igb_uio" -e "NIC=eth1" router
+$ docker run -d --privileged --network=host -e "CLIENT=$POD_IP" -e "SERVER=$POD_IP" -e "DPDK_DRIVER=igb_uio" -e "NIC=eth1" -v /sys/bus/pci/drivers:/sys/bus/pci/drivers -v /sys/kernel/mm/hugepages:/sys/kernel/mm/hugepages -v /sys/devices/system/node:/sys/devices/system/node -v /dev:/dev router
 ```
 
 `POD_IP` is the IP of the `Pod VM` and the env variable `DPDK_DRIVER` is configuring the kernel module
 used by nff-go (in the example it's `igb_uio`). The used network interface is configured by changing the env variable `NIC`, here it's `eth1`. 
+
+The docker settings are from [redhat-performance](https://github.com/redhat-performance/docker-dpdk/blob/master/Dockerfile#L4), unfortunately they don't work, so the router binary
+currently can not be run from a docker container, but has to be compiled and run on the _Router_ VM. 
 
 > **Hint**: The `docker run` call returns the container id. You can check the logs with `docker logs <container_id>`. 
 
