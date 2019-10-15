@@ -57,12 +57,12 @@ func setup() {
 	server = net.ParseIP(serverIPString)
 	mustHaveIP(server, "server ip")
 
-	driverName := os.Getenv("DRIVER")
+	driverName = os.Getenv("DRIVER")
 	if driverName == "" {
 		driverName = defaultDriver
 	}
 
-	nicName := os.Getenv("NIC")
+	nicName = os.Getenv("NIC")
 	if nicName == "" {
 		nicName = defaultNIC
 	}
@@ -75,7 +75,7 @@ func loadMAC() error {
 	// get localIP and mac
 	nic, err := net.InterfaceByName(nicName)
 	if err != nil {
-		return fmt.Errorf("given NIC %s must existing and accessible", nicName)
+		return fmt.Errorf("given NIC %s must exist and be accessible", nicName)
 	}
 	localMac = nic.HardwareAddr
 	local, err = getFirstIP(nic)
