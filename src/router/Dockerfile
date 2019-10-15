@@ -10,7 +10,7 @@ RUN apt-get update -qq && \
     apt-get install -y pkg-config curl cmake patch git unzip clang llvm libelf-dev kmod linux-base libssl-dev bison flex libncurses-dev bc zlib1g-dev libpcap-dev && \
     apt-get install -y --no-install-recommends bsdtar
 
-# Prepare kernel and compile/install libbpf
+# Prepare kernel
 ARG kernel_version=5.1
 RUN cd /usr/src && \
     wget -c https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${kernel_version}.tar.xz && \
@@ -18,17 +18,6 @@ RUN cd /usr/src && \
     cd linux-${kernel_version} && \
     make defconfig && \
     make modules_prepare
-
-# Adoptation for different networkdriver
-ARG libbpf_version=v0.0.3
-RUN cd /tmp/ && git clone -b ${libbpf_version} --single-branch --depth=1 https://github.com/libbpf/libbpf.git && \
-    cd libbpf/src && make && \
-    BUILD_STATIC_ONLY=y OBJDIR=/lib/x86_64-linux-gnu/ make install && \
-    mkdir -p /usr/include/uapi/linux/ && \
-    cd /tmp/libbpf/ && \
-    cp include/uapi/linux/* /usr/include/uapi/linux/ && \
-    cp /usr/include/uapi/linux/if_link.h /usr/include/linux && \
-    cp /usr/include/uapi/linux/bpf.h /usr/include/linux/
 
 # -------------------- BUILDER -----------------------
 FROM base-layer AS builder
