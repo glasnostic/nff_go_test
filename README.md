@@ -53,8 +53,7 @@ $ docker run -d --privileged --network=host -e "CLIENT=$POD_IP" -e "SERVER=$POD_
 `POD_IP` is the IP of the `Pod VM` and the env variable `DPDK_DRIVER` is configuring the kernel module
 used by nff-go (in the example it's `igb_uio`). The used network interface is configured by changing the env variable `NIC`, here it's `eth1`. 
 
-The docker settings are from [redhat-performance](https://github.com/redhat-performance/docker-dpdk/blob/master/Dockerfile#L4), unfortunately they don't work, so the router binary
-currently can not be run from a docker container, but has to be compiled and run on the _Router_ VM. 
+The docker settings are from [redhat-performance](https://github.com/redhat-performance/docker-dpdk/blob/master/Dockerfile#L4)
 
 > **Hint**: The `docker run` call returns the container id. You can check the logs with `docker logs <container_id>`. 
 
